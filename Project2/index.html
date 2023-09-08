@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>CS 4731 Final Project Part I</title>
+		<script id="vshader" type="x-shader/x-vertex">
+			attribute vec4 vPosition;
+			attribute vec4 vNormal;
+			attribute vec2 vTexCoord;
+
+			uniform mat4 modelViewMatrix;
+			uniform mat4 projectionMatrix;
+
+			varying vec2 fTexCoord;	
+
+			uniform vec4 lightPosition;
+			varying vec3 L, N, V;
+
+			varying vec3 refl;
+			varying vec3 refr;
+
+			void main() {
+				vec3 pos = (modelViewMatrix * vPosition).xyz;
+				L = normalize(lightPosition.xyz - pos);
+				N = normalize(modelViewMatrix *  vNormal).xyz;
+				V = normalize(-pos);
+				
+				refl = reflect(pos, N);
+				refr = refract(pos, N, 0.65);
+
+				fTexCoord = vTexCoord;
+				gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+			}
+		</script>
+
+		<script id="fshader" type="x-shader/x-fragment">
+			precision mediump float;
+			
+			uniform vec4 fAmbient, fDiffuse, fSpecular;
+
+
+			uniform int textureLoaded;
+			uniform sampler2D defaultTex;
+			uniform sampler2D tex;
+			uniform samplerCube texMap;
+			
+			uniform int isSkybox;
+			uniform int lightOn;
+			uniform int reflectionOn;
+			uniform int refractionOn;
+			uniform int textured;
+			uniform int fShadow;
+
+			varying vec3 L, N, V;
+			varying vec2 fTexCoord;
+
+			varying vec3 refl;
+			varying vec3 refr;
+
+			void main() {
+				float skyboxScale = 25.0;
+				float shininess = 10.0;
+				float ka = 0.2;
+				float kd = 1.0;
+				float ks = 1.0;
+				
+				vec4 fColor;
+
+				vec3 R = (2.0 * max(dot(L, N), 0.0) * N) - L;
+
+				if(fShadow == 1) fColor = vec4(0.0, 0.0, 0.0, 1.0);
+				else {
+					vec4 diffuse = kd * fDiffuse * max(dot(L, N), 0.0); 
+					vec4 specular = ks * fSpecular * pow(max(dot(R, V), 0.0), shininess);
+					vec4 ambient = ka * fDiffuse;
+			
+					if (lightOn == 1) fColor =  ambient + specular +  diffuse;
+					else fColor = ambient;
+
+					if (reflectionOn == 1 && isSkybox == 0) fColor = fColor + textureCube(texMap, skyboxScale * refl);
+					if (reflectionOn == 1 && isSkybox == 1) fColor = textureCube(texMap, skyboxScale * refl);
+					if (refractionOn == 1) fColor = fColor + textureCube(texMap, skyboxScale * refr);
+
+					if (textured == 1) {
+						if (textureLoaded == 0) fColor = fColor + texture2D(defaultTex, vec2(fTexCoord[0], fTexCoord[1]));
+						else fColor = fColor + texture2D(tex, vec2(fTexCoord[0], fTexCoord[1]));
+					}
+				}
+				fColor.a = 1.0;
+				gl_FragColor = fColor; 
+
+							}
+		</script>
+
+		<script type="text/javascript" src="lib/webgl-utils.js"></script>
+		<script type="text/javascript" src="lib/initShaders.js"></script>
+		<script type="text/javascript" src="lib/MV.js"></script>
+
+		<script type="text/javascript" src="lib/model.js"></script>
+		<script type="text/javascript" src="lib/face.js"></script>
+		<script type="text/javascript" src="main.js"></script>
+
+	</head>
+
+	<body onload="main()">
+		<h1 id="mode">CS 4731 Final Project</h1>
+
+		<canvas id="webgl" class="box" width="1600" height="900">
+			Please use a browser that supports the "canvas" tag.
+		</canvas>
+	</body>
+</html>

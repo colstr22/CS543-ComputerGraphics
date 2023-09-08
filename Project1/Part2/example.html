@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WebGL Example File</title>
+ 
+	<script id="vshader" type="x-shader/x-vertex">
+	
+	attribute vec4 vPosition;
+	attribute vec4 vNormal;
+	attribute vec4 vColor;
+	uniform mat4 projMatrix;
+	uniform mat4 modelMatrix;
+	uniform mat4 cameraMatrix;
+
+	uniform vec4 lightPosition;
+	
+	varying vec3 L, N, V;
+
+	void main() {
+		vec3 pos = (modelMatrix * vPosition).xyz;
+		V = normalize(lightPosition.xyz - pos);
+		N = normalize(projMatrix * cameraMatrix * modelMatrix * vNormal).xyz;
+		L = normalize(-pos);
+
+		gl_Position = projMatrix * cameraMatrix * modelMatrix * vPosition;
+  	}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+
+	precision mediump float;
+	
+	uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+
+	uniform float shininess;
+
+	varying vec3 L, N, V;
+	
+	void main() 
+	{
+		vec3 R = (2.0 * dot(N, L) * L) - N;
+
+		vec4 diffuse = diffuseProduct * dot(L, N);
+		vec4 ambient = ambientProduct;
+		vec4 specular = specularProduct * pow(max(dot(V, R), 0.0), shininess);
+
+		vec4 fColor = diffuse + ambient * specular;
+		fColor.a = 1.0;
+
+		gl_FragColor = fColor;
+  	}
+	</script>
+	
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+    
+    <script src="example.js"></script>
+
+  </head>
+ 
+  <body onload="main()">
+  
+    <canvas id="webgl" width="400" height="400">
+    	Please use a browser that supports the "canvas" tag.
+    </canvas>
+
+  </body>
+</html>

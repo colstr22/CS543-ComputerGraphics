@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>WebGL Example File</title>
+
+	<script id="vshader" type="x-shader/x-vertex">
+		attribute vec3 aPosition;
+		varying	vec3 vPosition;
+		void main() {
+			gl_Position = vec4(aPosition, 1.0);
+			vPosition = aPosition;
+		}
+	</script>
+
+	<script id="fshader" type="x-shader/x-fragment">
+		uniform int imageNumber;
+	
+		precision mediump float;
+		varying vec3 vPosition;
+	
+		// Structs and Constructors
+		struct Sphere {
+			vec3 center;
+			float radius;
+			vec3 color;
+			float reflectiveness;
+		};
+
+		Sphere makeSphere(vec3 center, float radius, vec3 color, float reflectiveness) {
+			Sphere ret;
+			ret.center = center;
+			ret.radius = radius;
+			ret.color = color;
+			ret.reflectiveness = reflectiveness;
+			return ret;
+		}
+
+		struct Plane {
+			vec3 center;
+			vec3 normal;
+			vec3 color;
+			float reflectiveness;
+		};
+		
+		Plane makePlane(vec3 center, vec3 normal, vec3 color, float reflectiveness) {
+			Plane ret;
+			ret.center = center;
+			ret.normal = normal;
+			ret.color = color;
+			ret.reflectiveness = reflectiveness;
+			return ret;
+		}
+
+		struct Light {
+			vec3 position;
+			float ambience;
+			vec3 specular;
+			vec3 diffuse;
+			float intensity;
+		};
+
+		Light makeLight(vec3 position, float ambience, float intensity) {
+			Light ret;
+			ret.position = position;
+			ret.ambience = ambience;
+			ret.intensity = intensity;
+			return ret;
+		}
+
+	
+		struct Ray {
+			vec3 origin;
+			vec3 direction;
+		};
+
+		Ray makeRay(vec3 origin, vec3 direction) {
+			Ray ret;
+			ret.origin = origin;
+			ret.direction = direction;
+			return ret;
+		}
+	
+		struct RayTracerOutput {
+			Ray reflectedRay;
+			vec3 color;
+			float reflectiveCoefficient;
+			float specularCoefficient;
+			float shadowCoefficient;
+		};
+
+		// Struct Storage
+		Sphere spheres[4];
+		Plane planes[6];
+		Ray rays[1];
+		Light light[1];
+		
+		// Images
+		void image1() {
+			// Create spheres
+			spheres[0] = makeSphere(vec3(-0.3, -0.25, 0.0), 0.25, vec3(1.0, 0.0, 0.0), 0.5);
+			spheres[1] = makeSphere(vec3(0.2, -0.25, -0.25), 0.25, vec3(0.0, 1.0, 0.0), 0.0);
+	
+			// Create Plane
+			planes[0] = makePlane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), 0.5);
+			
+			// Create Light source
+			light[0] = makeLight(vec3(-0.75, 0.75, 1.0), 0.1, 1.0);
+		}
+		
+		void image2() {
+			// Create spheres
+			spheres[0] = makeSphere(vec3(-0.5, -0.5, 0.0), 0.3, vec3(1.0, 0.0, 0.0), 0.5);
+			spheres[1] = makeSphere(vec3(0.5, -0.5, 0.0), 0.3, vec3(0.0, 0.0, 1.0), 0.5);
+			spheres[2] = makeSphere(vec3(-0.5, 0.5, 0.0), 0.3, vec3(1.0, 1.0, 0.0), 0.5);
+			spheres[3] = makeSphere(vec3(0.5, 0.5, 0.0), 0.3, vec3(0.0, 1.0, 0.0), 0.5);
+			
+			// Create Light source
+			light[0] = makeLight(vec3(0.0, 0.0, 1.0), 0.1, 1.0);
+	
+		}
+	
+		void image3() {
+			// Create spheres
+			spheres[0] = makeSphere(vec3(-0.25, -0.3, 0.0), 0.25, vec3(1.0, 1.0, 1.0), 1.0);
+			spheres[1] = makeSphere(vec3(0.25, -0.3, 0.25), 0.25, vec3(0.0, 1.0, 0.0), 0.0);
+			
+			// Create Planes
+			planes[0] = makePlane(vec3(0.0, -0.5, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), 0.0);
+			planes[1] = makePlane(vec3(0.0, 0.5, 0.0), vec3(0.0, -1.0, 0.0), vec3(1.0, 0.0, 1.0), 0.0);
+			planes[2] = makePlane(vec3(-0.5, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 1.0), 0.0);
+			planes[3] = makePlane(vec3(0.5, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), 0.0);
+			planes[4] = makePlane(vec3(0.0, 0.0, -0.5), vec3(0.0, 0.0, 1.0), vec3(1.0, 1.0, 0.0), 0.0);
+			planes[5] = makePlane(vec3(0.0, 0.0, 0.5), vec3(0.0, 0.0, -1.0), vec3(1.0, 1.0, 1.0), 0.0);
+			
+			// Create Light source
+			light[0] = makeLight(vec3(0.0, 0.5, 0.0), 0.1, 1.0);
+		}
+
+		// Setup
+		void initialize() {
+			float x = vPosition.x;
+			float y = vPosition.y;
+			float z = vPosition.z;
+			float focalLength = 2.0;
+			vec3 color = vec3(0.0, 0.0, 0.0);
+	
+			// Create Spheres and Planes
+			if (imageNumber == 1) {
+				image1();
+			}
+			if (imageNumber == 2) {
+				image2();
+			}
+			if (imageNumber == 3) {
+				image3();
+			}
+	
+			// Create Ray
+			rays[0] = makeRay(vec3(0.0, 0.0, focalLength), normalize(vec3(x, y, -focalLength)));
+		}
+	
+		float checkIntersectSphere(Sphere sphere, Ray ray, int type) {
+			// Sphere Info
+			vec3 sphereCenter = sphere.center;
+			float radius = sphere.radius;
+
+			// Ray Info
+			vec3 cameraSource = ray.origin;
+			vec3 cameraDirection = ray.direction;
+	
+			vec3 distanceFromCenter = (cameraSource - sphereCenter);
+			float B = 2.0 * dot(cameraDirection, distanceFromCenter);
+			float C = dot(distanceFromCenter, distanceFromCenter) - pow(radius, 2.0);
+			float delta = pow(B, 2.0) - 4.0 * C;
+			
+			// There are 2 Points of Intersection
+			if (delta > 0.0) {
+				float sqRoot = sqrt(delta);
+				float t1 = (-B + sqRoot) / 2.0;
+				float t2 = (-B - sqRoot) / 2.0;
+				
+				// Get the Right Intersection
+				if (type == 0) { return min(t1, t2); }
+				if (type == 1) { return max(t1, t2); }
+			}
+	
+			// The Ray is Tangent to the Sphere
+			if (delta == 0.0) {
+				return -B / 2.0;
+			}
+
+			if (delta < 0.0) {
+				return 0.0;
+			}
+		}
+	
+		float checkIntersectPlane(Plane plane, Ray ray) {
+			// Plane Info
+			vec3 planeCenter = plane.center;
+			vec3 planeNormal = plane.normal;
+			// Ray Info
+			vec3 cameraSource = ray.origin;
+			vec3 cameraDirection = ray.direction;
+	
+			// Calculate Intersection
+			float t = 0.0;		
+			float delta = dot(cameraDirection, planeNormal);
+			if ( delta < 0.0 ) {
+				t = dot((planeCenter - cameraSource ), planeNormal) / dot(cameraDirection, planeNormal);
+			}
+	
+			return t;
+		}
+	
+		 RayTracerOutput getRay(Ray ray, Light light) {
+	
+			RayTracerOutput rayTracer;
+			vec3 color = vec3(0.0, 0.0, 0.0);
+	
+			float t = 0.0;
+			float minT = 1000000.0;
+			Plane planeToShow;
+			Sphere sphereToShow;
+			int typeToShow = 0; // 0 = undetermined, 1 sphere, 2 = plane, 
+			
+			// Check intersections with all Planes.
+			for(int i = 0; i < 6; i++) {
+				t = checkIntersectPlane(planes[i], ray);
+	
+				// Only Use closest intersection
+				if(t > 0.0 && t < minT) {
+					minT = t;
+					planeToShow = planes[i];
+				 	typeToShow = 2;
+				}
+			}
+			
+			// Check intersections with all spheres.
+			for(int i = 0; i < 4; i++) {
+				t = checkIntersectSphere(spheres[i], ray, 0);
+	
+				// Only Use closest intersection
+				if(t > 0.0 && t < minT) {
+					minT = t;
+					sphereToShow = spheres[i];
+				 	typeToShow = 1;
+				}
+			}
+	
+			// If Intersection is in Range 
+			if(minT > 0.0 && minT < 1000000.0) {
+			 	
+				// General Light and Ray Info
+				vec3 cameraSource = ray.origin;
+				vec3 cameraDirection = ray.direction;
+				vec3 lightSource = light.position;
+				float ambience = light.ambience;
+	
+			 	// General Surface Point Formula
+				vec3 surfacePoint = cameraSource + (minT * cameraDirection);
+		
+				// Variable Declarations
+				float reflectiveness;
+				vec3 initialColor;
+				vec3 surfaceNormal;
+	
+				// Sphere Info
+				if (typeToShow == 1) {
+					vec3 sphereCenter = sphereToShow.center;
+					reflectiveness = sphereToShow.reflectiveness;
+					initialColor = sphereToShow.color;
+			 		surfaceNormal = normalize(surfacePoint - sphereCenter);
+					reflectiveness = sphereToShow.reflectiveness;
+				}
+				// Plane info
+				if (typeToShow == 2) {
+					vec3 planeCenter = planeToShow.center;
+					vec3 planeNormal = planeToShow.normal;
+			 		reflectiveness = planeToShow.reflectiveness;
+					initialColor = planeToShow.color;
+					surfaceNormal = normalize(planeNormal + (surfacePoint - planeCenter));
+					reflectiveness = planeToShow.reflectiveness;
+				}
+	
+	
+			 	// General Funcitons Of Light
+			     	if (typeToShow == 1) {
+			     		color = initialColor * (ambience + ((1.0 - ambience) * max(0.0, dot(surfaceNormal, lightSource))));
+			     	}
+			     	if (typeToShow == 2) { color = initialColor; }
+				rayTracer.color = color;
+	
+				Ray reflectionRay;
+				vec3 reflection = reflect(ray.direction, surfaceNormal);
+				reflectionRay.origin = surfacePoint - 0.0001 * surfaceNormal;
+				reflectionRay.direction = reflection;
+				rayTracer.reflectiveCoefficient = reflectiveness;
+				rayTracer.reflectedRay = reflectionRay;
+				
+			 	if (typeToShow == 1) {
+			 		rayTracer.specularCoefficient = max(0.0, dot(light.position - surfacePoint, reflectionRay.direction));
+				}
+			 	if (typeToShow == 2) {
+			 		rayTracer.specularCoefficient = 0.0;
+				}
+			 
+			 	// Check for Shadow	     	
+			     	float shadow = 1.0;
+			 	for(int i = 0; i < 4; i++) {
+					Ray lightToHere = makeRay(surfacePoint - 0.0001 * surfaceNormal, normalize(light.position - surfacePoint));
+			     		float t1 = checkIntersectSphere(spheres[i], lightToHere, 0);
+			     		float t2 = checkIntersectSphere(spheres[i], lightToHere, 1);
+		     			t = max(t1, t2);
+					if (t1 > 0.0 && t1 <  1000000.0) {
+				  		shadow = shadow - (abs(t1 - t2) / (spheres[i].radius * 2.0)); 
+					}
+				}
+			     	
+			     	rayTracer.shadowCoefficient = shadow;
+
+			 }
+			 // Otherwise Background Color
+			 else {
+				rayTracer.color = color;
+				rayTracer.reflectiveCoefficient = 0.0;
+			 	rayTracer.specularCoefficient = 0.0;
+			 	rayTracer.shadowCoefficient = 0.0;
+			 }
+	
+			return rayTracer;
+		 }
+	
+		void main() {
+			initialize();
+			RayTracerOutput mainRay = getRay(rays[0], light[0]);
+			RayTracerOutput reflectionRay = getRay(mainRay.reflectedRay, light[0]);
+			RayTracerOutput reflectionRay2 = getRay(reflectionRay.reflectedRay, light[0]);
+			
+			vec3 mainColor = mainRay.color;
+			float r1 = mainRay.reflectiveCoefficient;
+			vec3 reflectedColor = reflectionRay.color;
+			float r2 = reflectionRay.reflectiveCoefficient;
+			float specular = min(max(mainRay.specularCoefficient * r1, 0.0), 1.0);
+			float shadow = min(max(mainRay.shadowCoefficient, 0.0), 1.0);
+
+			vec3 specularColor = specular * light[0].intensity * vec3(1.0, 1.0, 1.0);
+	
+			gl_FragColor = vec4((specularColor + shadow * (mainColor + r1 * (reflectionRay.color + r2 * reflectionRay2.color))), 1.0);
+			}
+		
+	</script>
+
+	<script src="lib/webgl-utils.js"></script>
+	<script src="lib/initShaders.js"></script>
+	<script src="lib/MV.js"></script>
+
+	<script src="main.js"></script>
+</head>
+
+<body onload="main()">
+
+	<canvas id="webgl" width="400" height="400">
+		Please use a browser that supports the "canvas" tag.
+	</canvas>
+	<p></p>
+	<button id = "button1" type="button"> Image 1 </button>
+	<button id = "button2" type="button"> Image 2 </button>
+	<button id = "button3" type="button"> Image 3 </button>
+
+</body>
+</html>
